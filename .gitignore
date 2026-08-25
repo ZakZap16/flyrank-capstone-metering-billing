@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+
+# Local databases
+*.sqlite
+*.db
+*.sqlite3
+
+# Docker
+.docker/
+
+# Alembic cache
+alembic/__pycache__/
