@@ -2,9 +2,7 @@ from logging.config import fileConfig
 import sys
 from pathlib import Path
 from sqlalchemy import engine_from_config, pool
-
-# TEMP: Disable model import until Phase 1
-#from src.config.database import Base
+from src.models.base import Base
 from alembic import context
 
 
@@ -22,11 +20,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
-
-# TEMP: Disable model import until Phase 1
-
-#target_metadata = Base.metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -59,22 +53,20 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = config.attributes.get("connection", None)
+    from src.config.settings import get_settings
+    from sqlalchemy import create_engine
+    from sqlalchemy import pool
     
-    if connectable is None:
-        # Use the URL from alembic.ini directly
-        connectable = engine_from_config(
-            config.get_section(config.config_ini_section, {}),
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-        )
-
+    settings = get_settings()
+    # Use sync URL for alembic
+    sync_url = str(settings.DATABASE_URL).replace("asyncpg", "psycopg2")
+    
+    connectable = create_engine(sync_url, poolclass=pool.NullPool)
+    
     with connectable.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
-
         with context.begin_transaction():
             context.run_migrations()
 
