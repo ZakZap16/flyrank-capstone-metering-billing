@@ -4,8 +4,8 @@ from src.models.base import Base
 import enum
 
 class PlanTier(str, enum.Enum):
-    FREE = "free"
-    PRO = "pro"
+    FREE = "FREE"
+    PRO = "PRO"
 
 class Plan(Base):
     __tablename__ = "plans"
