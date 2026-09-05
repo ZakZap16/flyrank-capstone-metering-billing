@@ -7,6 +7,7 @@ class Tenant(Base, TimestampMixin):
     __tablename__ = "tenants"
     
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     stripe_customer_id: Mapped[str | None] = mapped_column(
         String(255), unique=True, nullable=True, index=True
     )

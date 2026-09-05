@@ -5,7 +5,6 @@ from src.api.middleware.auth import get_current_tenant
 from src.services.meter_service import MeterService
 from src.schemas.meter import MeterRequest, MeterResponse, QuotaExceededError, PaymentRequiredError
 from src.models.tenant import Tenant
-import uuid
 
 router = APIRouter(prefix="/meter", tags=["metering"])
 
@@ -35,15 +34,6 @@ async def record_usage(
     
     **Quota**: Enforced before recording. Returns 429 if exceeded.
     """
-    # Validate idempotency key format (UUID v4)
-    try:
-        uuid.UUID(idempotency_key, version=4)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Idempotency-Key must be a valid UUID v4"
-        )
-    
     meter_service = MeterService(db)
     
     try:

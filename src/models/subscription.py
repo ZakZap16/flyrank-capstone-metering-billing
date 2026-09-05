@@ -37,6 +37,9 @@ class Subscription(Base, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     cancel_at_period_end: Mapped[bool] = mapped_column(default=False, nullable=False)
+    canceled_at: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     
     tenant: Mapped[Tenant] = relationship(back_populates="subscription", lazy="selectin")
     plan: Mapped["Plan"] = relationship(lazy="selectin")

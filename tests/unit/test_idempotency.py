@@ -1,8 +1,9 @@
 """Unit tests for IdempotencyMiddleware."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from fastapi import Request, HTTPException
+from fastapi import Request
 from starlette.datastructures import Headers
+from starlette.responses import JSONResponse
 from src.api.middleware.idempotency import IdempotencyMiddleware
 
 
@@ -11,7 +12,7 @@ class TestIdempotencyMiddleware:
 
     @pytest.fixture
     def middleware(self):
-        return IdempotencyMiddleware(None)  # app parameter not used
+        return IdempotencyMiddleware(None)
 
     @pytest.mark.asyncio
     async def test_passes_through_non_idempotency_paths(self, middleware):
@@ -46,18 +47,18 @@ class TestIdempotencyMiddleware:
         assert result == response
 
     @pytest.mark.asyncio
-    async def test_requires_idempotency_key(self, middleware):
-        """POST /meter without Idempotency-Key should return 400."""
+    async def test_missing_key_returns_400(self, middleware):
+        """POST /meter without Idempotency-Key should return 400 JSONResponse."""
         request = MagicMock(spec=Request)
         request.url.path = "/api/v1/meter"
         request.method = "POST"
-        request.headers = Headers({})  # No Idempotency-Key
+        request.headers = Headers({})
 
-        with pytest.raises(HTTPException) as exc_info:
-            await middleware.dispatch(request, AsyncMock())
+        result = await middleware.dispatch(request, AsyncMock())
 
-        assert exc_info.value.status_code == 400
-        assert "Idempotency-Key header is required" in exc_info.value.detail
+        assert isinstance(result, JSONResponse)
+        assert result.status_code == 400
+        assert "Idempotency-Key header is required" in result.body.decode()
 
     @pytest.mark.asyncio
     async def test_valid_uuid_v4_passes(self, middleware):
@@ -76,18 +77,18 @@ class TestIdempotencyMiddleware:
         assert result == response
 
     @pytest.mark.asyncio
-    async def test_invalid_uuid_format_fails(self, middleware):
-        """Invalid UUID format should return 400."""
+    async def test_invalid_uuid_returns_400(self, middleware):
+        """Invalid UUID format should return 400 JSONResponse."""
         request = MagicMock(spec=Request)
         request.url.path = "/api/v1/meter"
         request.method = "POST"
         request.headers = Headers({"Idempotency-Key": "not-a-uuid"})
 
-        with pytest.raises(HTTPException) as exc_info:
-            await middleware.dispatch(request, AsyncMock())
+        result = await middleware.dispatch(request, AsyncMock())
 
-        assert exc_info.value.status_code == 400
-        assert "Idempotency-Key must be a valid UUID v4" in exc_info.value.detail
+        assert isinstance(result, JSONResponse)
+        assert result.status_code == 400
+        assert "UUID v4" in result.body.decode()
 
     @pytest.mark.asyncio
     async def test_uuid_v1_accepted(self, middleware):

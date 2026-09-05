@@ -24,12 +24,12 @@ TEST_DATABASE_URL = str(settings.DATABASE_URL).replace(
     "metering_billing", "metering_billing_test"
 )
 
+
 @pytest_asyncio.fixture
 async def async_session():
     """Create a fresh session with a fresh transaction per test."""
     from sqlalchemy import text, event
 
-    # Create a fresh engine per function (avoids event loop issues)
     engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
 
     async with engine.begin() as conn:
@@ -40,7 +40,6 @@ async def async_session():
     async with async_session_maker() as session:
         from src.models.plan import Plan
 
-        # Seed plans lookup data
         plans = {
             PlanTier.FREE: {
                 "name": "Free",
@@ -72,11 +71,11 @@ async def async_session():
         yield session
         await session.close()
 
+
 @pytest_asyncio.fixture
 async def client(async_session):
     """AsyncClient with overridden database dependency."""
     from src.api.deps import get_db
-    from src.main import create_app
     from src.api.middleware.rate_limit import rate_limiter
 
     app = create_app()
@@ -100,6 +99,34 @@ async def client(async_session):
 
     app.dependency_overrides.clear()
 
+
+@pytest_asyncio.fixture
+async def async_client(async_session):
+    """Alias for client - AsyncClient with overridden database dependency."""
+    from src.api.deps import get_db
+    from src.api.middleware.rate_limit import rate_limiter
+
+    app = create_app()
+
+    async def override_get_db():
+        try:
+            yield async_session
+            await async_session.flush()
+            await async_session.commit()
+        except Exception:
+            await async_session.rollback()
+            raise
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    rate_limiter._requests.clear()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
 @pytest_asyncio.fixture
 async def test_tenant(async_session):
     """Create a test tenant with Free plan subscription."""
@@ -107,18 +134,17 @@ async def test_tenant(async_session):
     sub_repo = SubscriptionRepository(async_session)
     plan_repo = PlanRepository(async_session)
 
-    # Create tenant
     plain_key, key_hash = AuthService.generate_api_key()
     tenant = await tenant_repo.create(
         name="Test Tenant",
+        email="test@example.com",
         api_key_hash=key_hash,
+        stripe_customer_id="cus_test_123",
     )
     await async_session.commit()
 
-    # Get Free plan
     free_plan = await plan_repo.get_by_id(PlanTier.FREE)
 
-    # Create active subscription
     subscription = Subscription(
         tenant_id=tenant.id,
         plan_id=PlanTier.FREE,
@@ -130,6 +156,7 @@ async def test_tenant(async_session):
     await async_session.commit()
 
     return tenant
+
 
 @pytest_asyncio.fixture
 def auth_headers(test_tenant):

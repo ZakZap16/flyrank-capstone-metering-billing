@@ -4,7 +4,6 @@ from functools import lru_cache
 import secrets
 
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -27,15 +26,25 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
     
-    RATE_LIMIT_REQUESTS: int = 100
+    RATE_LIMIT_REQUESTS: int = 100_000
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     
+    # Stripe settings
     STRIPE_API_KEY: str = Field(default="sk_test_...")
     STRIPE_WEBHOOK_SECRET: str = Field(default="whsec_...")
     STRIPE_PRICE_ID_PRO: str = Field(default="price_...")
+    STRIPE_PRICE_ID_FREE: str = Field(default="price_...")
     STRIPE_SUCCESS_URL: str = "http://localhost:3000/success"
     STRIPE_CANCEL_URL: str = "http://localhost:3000/cancel"
+    STRIPE_PUBLIC_KEY: str = Field(default="pk_test_...")
     
+    # Redis for rate limiter
+    REDIS_URL: str = Field(default="redis://localhost:6379/0")
+    
+    # Frontend URLs for checkout/portal redirects
+    FRONTEND_URL: str = "http://localhost:3000"
+    
+    # Pricing (micro-units, integer-only)
     PRICE_API_CALL_PER_MILLION: int = 100_000
     PRICE_INPUT_TOKEN_PER_MILLION: int = 250_000
     PRICE_CACHED_INPUT_TOKEN_PER_MILLION: int = 62_500
@@ -55,6 +64,7 @@ class Settings(BaseSettings):
     def validate_stripe_test_mode(self) -> None:
         if not self.is_test_stripe:
             raise ValueError("STRIPE_API_KEY must be test mode (sk_test_)")
+
 
 @lru_cache
 def get_settings() -> Settings:

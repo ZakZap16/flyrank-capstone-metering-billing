@@ -19,6 +19,27 @@ class SubscriptionRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
     
+    async def get_by_stripe_id(self, stripe_subscription_id: str) -> Subscription | None:
+        """Get subscription by Stripe subscription ID"""
+        stmt = select(Subscription).where(
+            Subscription.stripe_subscription_id == stripe_subscription_id,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+    
+    async def create(self, subscription: Subscription) -> Subscription:
+        """Create a new subscription"""
+        self.session.add(subscription)
+        await self.session.flush()
+        await self.session.refresh(subscription)
+        return subscription
+    
+    async def update(self, subscription: Subscription) -> Subscription:
+        """Update an existing subscription"""
+        await self.session.flush()
+        await self.session.refresh(subscription)
+        return subscription
+    
     async def upsert_from_stripe(
         self,
         tenant_id: uuid.UUID,

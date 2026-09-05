@@ -2,6 +2,10 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from src.schemas.meter import QuotaExceededError, PaymentRequiredError
 from pydantic import ValidationError
+import logging
+import stripe
+
+logger = logging.getLogger(__name__)
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register custom exception handlers for the FastAPI app."""
@@ -43,8 +47,17 @@ def register_exception_handlers(app: FastAPI) -> None:
             },
         )
     
+    @app.exception_handler(stripe.error.StripeError)
+    async def stripe_error_handler(request: Request, exc: stripe.error.StripeError):
+        logger.error("stripe_error: %s", str(exc))
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "billing_error", "message": "Payment processing failed"},
+        )
+    
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
+        logger.exception("unhandled_error")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

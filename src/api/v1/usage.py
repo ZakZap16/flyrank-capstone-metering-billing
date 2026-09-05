@@ -9,7 +9,7 @@ from src.repositories.usage_repo import UsageRepository
 from src.models.tenant import Tenant
 from src.models.usage_event import UsageType
 from src.utils.money import microunits_to_cents
-from src.schemas.usage import UsageResponse
+from src.schemas.usage import UsageResponse, UsageDetail, TokenBreakdown
 
 router = APIRouter(prefix="/usage", tags=["usage"])
 

@@ -95,4 +95,4 @@ class UsageRepository:
                 )
             )
         )
-        return result.scalar_one()
+        return int(result.scalar_one())
