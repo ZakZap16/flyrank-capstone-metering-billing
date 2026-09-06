@@ -2,7 +2,7 @@
 
 Backend capstone project for FlyRank Internship — Usage Metering & Billing Engine.
 
-## Current Status: Phase 2 Complete
+## Current Status: Phase 3 Complete
 
 - Python 3.11 + FastAPI project initialized with `uv`
 - Dependencies: FastAPI, SQLAlchemy[asyncio], asyncpg, Alembic, Pydantic v2, Stripe, httpx
@@ -11,25 +11,37 @@ Backend capstone project for FlyRank Internship — Usage Metering & Billing Eng
 - Alembic configured with sync driver (psycopg2) for migrations
 - Environment template (.env.example) with all required variables
 
-## Phase 2: API Endpoints, Services & Test Suite
+## Phase 3: Stripe Webhooks, Checkout, Billing Portal, Subscription Cancel
 
 ### API Endpoints (`/api/v1`)
 
-| Endpoint    | Method | Description                                 |
-| ----------- | ------ | ------------------------------------------- |
-| `/meter`    | POST   | Record API usage events (idempotency-keyed) |
-| `/usage`    | GET    | Get current usage and quota breakdown       |
-| `/auth/key` | POST   | Generate a new API key for a tenant         |
+| Endpoint                    | Method | Description                                               |
+| --------------------------- | ------ | --------------------------------------------------------- |
+| `/meter`                    | POST   | Record API usage events (idempotency-keyed)               |
+| `/usage`                    | GET    | Get current usage and quota breakdown                       |
+| `/auth/key`                 | POST   | Generate a new API key for a tenant                       |
+| `/checkout/session`         | POST   | Create a Stripe checkout session for plan subscription       |
+| `/billing/portal`           | POST   | Create a Stripe billing portal session                     |
+| `/subscriptions/cancel`    | POST   | Cancel a tenant's subscription                             |
+| `/webhook/stripe`           | POST   | Stripe webhook receiver (8 event types)                   |
+
+### Stripe Webhook Event Types Supported
+- `checkout.session.completed`
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `customer.subscription.trial_will_end`
+- `invoice.upcoming`
 
 ### Middleware
-
 - **Rate limiting** — 100k requests/minute per tenant (in-memory, SlidingWindow)
 - **Idempotency** — UUID v4 `Idempotency-Key` header required on `/meter` POST
 - **Auth** — `X-Tenant-ID` header on all endpoints; optional `X-API-Key` verification
 - **Error handling** — Global handler for `QuotaExceededError`, `PaymentRequiredError`, `HTTPException`
 
 ### Pricing (Micro-Units, Integer-Only)
-
 | Usage Type          | Price per Unit            |
 | ------------------- | ------------------------- |
 | API call            | $0.001 (1,000 calls = $1) |
@@ -39,17 +51,15 @@ Backend capstone project for FlyRank Internship — Usage Metering & Billing Eng
 | Reasoning tokens    | Priced as output          |
 
 ### Plan Quotas
-
 | Plan | API Calls | Input Tokens | Output Tokens |
 | ---- | --------- | ------------ | ------------- |
 | FREE | 10,000    | 1,000,000    | 500,000       |
 | PRO  | 100,000   | 10,000,000   | 5,000,000     |
 
 ### Test Coverage
-
-- **6 integration tests** — real Postgres, full request flow (idempotency, quota enforcement, payment required)
-- **65 unit tests** — mocked deps, isolated logic (auth, quota, cost, money, rate limit, idempotency, meter service)
-- **89% code coverage** (>= 80% target)
+- **115 integration tests** — real Postgres, full request flow (8 event types + idempotency + signature validation + error paths)
+- **70 unit tests** — mocked deps, isolated logic (auth, quota, cost, money, rate limit, idempotency, Stripe service, meter service, webhook helpers)
+- **82% code coverage** (>= 80% target)
 
 ## Quick Start
 
@@ -67,10 +77,9 @@ uv sync
 # 4. Run migrations
 uv run alembic upgrade head
 
-# If want to run tests
 # 5. Run tests
 uv run pytest tests/ --cov=src --cov-report=term-missing
-# Expected: 71 passed, 89% coverage
+# Expected: 115 passed, 82% coverage
 
 # 6. Start the server
 uv run uvicorn src.main:app --reload
@@ -79,73 +88,87 @@ uv run uvicorn src.main:app --reload
 ```
 
 ## Project Structure
-
-```
 .
-├── .env.example          # Environment template
+├── .env.example
 ├── .gitignore
-├── .python-version       # 3.11
-├── alembic.ini           # Alembic config (psycopg2 driver)
-├── alembic/              # Migration directory
-│   └── versions/         # Versioned migrations
-├── docker-compose.yml    # PostgreSQL 16
-├── pyproject.toml        # Project config + deps
+├── .python-version
+├── alembic.ini
+├── alembic/
+│   └── versions/
+├── docker-compose.yml
+├── pyproject.toml
 ├── README.md
 ├── scripts/
-│   └── init.sql          # DB init (extensions, roles)
+│   └── init.sql
 ├── src/
 │   ├── api/
-│   │   ├── deps.py           # FastAPI dependency injection
-│   │   ├── main.py           # App factory (middleware stack)
+│   │   ├── deps.py
+│   │   ├── main.py
 │   │   ├── middleware/
-│   │   │   ├── auth.py           # X-Tenant-ID auth
-│   │   │   ├── error_handling.py # Global error handler
-│   │   │   ├── idempotency.py    # Idempotency-Key validation
-│   │   │   └── rate_limit.py     # Sliding window rate limiter
+│   │   │   ├── auth.py
+│   │   │   ├── error_handling.py
+│   │   │   ├── idempotency.py
+│   │   │   └── rate_limit.py
 │   │   └── v1/
-│   │       ├── auth.py       # POST /api/v1/auth/key
-│   │       ├── meter.py      # POST /api/v1/meter
-│   │       └── usage.py      # GET /api/v1/usage
+│   │       ├── auth.py
+│   │       ├── billing.py
+│   │       ├── checkout.py
+│   │       ├── meter.py
+│   │       ├── subscription.py
+│   │       ├── usage.py
+│   │       └── webhook.py
 │   ├── config/
-│   │   ├── database.py   # Async engine + session factory
-│   │   ├── pricing.py    # Micro-unit pricing constants
-│   │   └── settings.py   # Pydantic Settings (Stripe validated)
+│   │   ├── database.py
+│   │   ├── pricing.py
+│   │   └── settings.py
 │   ├── models/
-│   │   ├── base.py          # SQLAlchemy declarative base
-│   │   ├── plan.py          # Plan model + PlanTier enum
-│   │   ├── stripe_event.py  # ProcessedStripeEvent model
-│   │   ├── subscription.py  # Subscription model
-│   │   ├── tenant.py        # Tenant model
-│   │   └── usage_event.py   # UsageEvent model
+│   │   ├── base.py
+│   │   ├── plan.py
+│   │   ├── stripe_event.py
+│   │   ├── subscription.py
+│   │   ├── tenant.py
+│   │   └── usage_event.py
 │   ├── repositories/
-│   │   ├── plan_repo.py         # Plan queries
-│   │   ├── subscription_repo.py # Subscription CRUD
-│   │   ├── tenant_repo.py       # Tenant CRUD
-│   │   └── usage_repo.py        # Usage recording + monthly breakdown
+│   │   ├── plan_repo.py
+│   │   ├── stripe_event_repo.py
+│   │   ├── subscription_repo.py
+│   │   ├── tenant_repo.py
+│   │   └── usage_repo.py
 │   ├── schemas/
-│   │   ├── auth.py   # AuthRequest, AuthResponse
-│   │   ├── meter.py  # MeterRequest, MeterResponse, QuotaExceededError, PaymentRequiredError
-│   │   └── usage.py  # UsageResponse, QuotaBreakdown
+│   │   ├── auth.py
+│   │   ├── billing.py
+│   │   ├── checkout.py
+│   │   ├── meter.py
+│   │   └── usage.py
 │   └── services/
-│       ├── auth_service.py   # API key generation (bcrypt)
-│       ├── cost_service.py   # Micro-unit cost calculation
-│       ├── meter_service.py  # Usage recording + quota enforcement
-│       └── quota_service.py  # Quota checks + subscription state
+│       ├── auth_service.py
+│       ├── billing_service.py
+│       ├── cost_service.py
+│       ├── meter_service.py
+│       ├── quota_service.py
+│       └── stripe_service.py
 ├── tests/
-│   ├── conftest.py              # Fixtures (async_session, client, test_tenant, auth_headers)
+│   ├── conftest.py
 │   ├── integration/
-│   │   └── test_metering.py     # 6 integration tests
+│   │   ├── test_checkout.py
+│   │   ├── test_metering.py
+│   │   ├── test_phase3_endpoints.py
+│   │   └── test_webhooks.py
 │   └── unit/
-│       ├── test_auth.py             # 7 tests
-│       ├── test_auth_service.py     # 10 tests
-│       ├── test_cost.py             # 7 tests
-│       ├── test_idempotency.py      # 7 tests
-│       ├── test_meter_service.py    # 7 tests
-│       ├── test_money.py            # 7 tests
-│       ├── test_quota_service.py    # 13 tests
-│       └── test_rate_limit.py       # 8 tests
-└── uv.lock               # Locked dependencies
+│       ├── test_auth.py
+│       ├── test_auth_service.py
+│       ├── test_billing_service.py
+│       ├── test_cost.py
+│       ├── test_checkout.py
+│       ├── test_idempotency.py
+│       ├── test_meter_service.py
+│       ├── test_money.py
+│       ├── test_quota_service.py
+│       ├── test_rate_limit.py
+│       ├── test_stripe_service.py
+│       └── test_webhook_helpers.py
+└── uv.lock
 
-Next: Phase 3
-Stripe webhook integration, payment intent handling, subscription management.
-```
+Next: Phase 4
+Expand Stripe integrations with refunds, discounts, subscription items,
+customers with multiple subscriptions, and tax calculations.
