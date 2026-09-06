@@ -2,7 +2,7 @@
 
 Backend capstone project for FlyRank Internship — Usage Metering & Billing Engine.
 
-## Current Status: Phase 3 Complete
+## Current Status: Phase 4 Complete
 
 - Python 3.11 + FastAPI project initialized with `uv`
 - Dependencies: FastAPI, SQLAlchemy[asyncio], asyncpg, Alembic, Pydantic v2, Stripe, httpx
@@ -11,14 +11,33 @@ Backend capstone project for FlyRank Internship — Usage Metering & Billing Eng
 - Alembic configured with sync driver (psycopg2) for migrations
 - Environment template (.env.example) with all required variables
 
-## Phase 3: Stripe Webhooks, Checkout, Billing Portal, Subscription Cancel
+## Phase 4: Cost Calculation & Python Pricing Engine
+
+### Pricing Configuration (`src/config/pricing.py`)
+
+Immutable `@dataclass(frozen=True)` with per-1,000-unit micro-unit pricing. Loaded from Pydantic Settings (environment variables).
+
+### Pricing (Micro-Units, Per 1,000 Units)
+
+| Usage Type          | Price per 1K Units     |
+| ------------------- | ---------------------- |
+| API call            | 1,000,000 µ-units ($1) |
+| Input tokens        | 150 µ-units ($0.00015) |
+| Cached input tokens | 75 µ-units (50% discount) |
+| Output tokens       | 600 µ-units ($0.0006)  |
+| Reasoning tokens    | 600 µ-units (same as output) |
+
+### Billing Rules Engine (`src/services/cost_service.py`)
+1. Input tokens × standard rate; cached input tokens × discounted rate
+2. Output tokens + reasoning tokens × output rate (combined billing)
+3. Each category calculated independently before summing — no cross-category token mixing
 
 ### API Endpoints (`/api/v1`)
 
 | Endpoint                    | Method | Description                                               |
 | --------------------------- | ------ | --------------------------------------------------------- |
 | `/meter`                    | POST   | Record API usage events (idempotency-keyed)               |
-| `/usage`                    | GET    | Get current usage and quota breakdown                       |
+| `/usage`                    | GET    | Get current usage and quota breakdown with cost rollup      |
 | `/auth/key`                 | POST   | Generate a new API key for a tenant                       |
 | `/checkout/session`         | POST   | Create a Stripe checkout session for plan subscription       |
 | `/billing/portal`           | POST   | Create a Stripe billing portal session                     |
@@ -41,15 +60,6 @@ Backend capstone project for FlyRank Internship — Usage Metering & Billing Eng
 - **Auth** — `X-Tenant-ID` header on all endpoints; optional `X-API-Key` verification
 - **Error handling** — Global handler for `QuotaExceededError`, `PaymentRequiredError`, `HTTPException`
 
-### Pricing (Micro-Units, Integer-Only)
-| Usage Type          | Price per Unit            |
-| ------------------- | ------------------------- |
-| API call            | $0.001 (1,000 calls = $1) |
-| Input tokens        | $0.15 / 1M tokens         |
-| Cached input tokens | 50% discount              |
-| Output tokens       | $0.60 / 1M tokens         |
-| Reasoning tokens    | Priced as output          |
-
 ### Plan Quotas
 | Plan | API Calls | Input Tokens | Output Tokens |
 | ---- | --------- | ------------ | ------------- |
@@ -57,8 +67,7 @@ Backend capstone project for FlyRank Internship — Usage Metering & Billing Eng
 | PRO  | 100,000   | 10,000,000   | 5,000,000     |
 
 ### Test Coverage
-- **115 integration tests** — real Postgres, full request flow (8 event types + idempotency + signature validation + error paths)
-- **70 unit tests** — mocked deps, isolated logic (auth, quota, cost, money, rate limit, idempotency, Stripe service, meter service, webhook helpers)
+- **137 tests passing** — integration + unit tests
 - **82% code coverage** (>= 80% target)
 
 ## Quick Start
@@ -79,7 +88,7 @@ uv run alembic upgrade head
 
 # 5. Run tests
 uv run pytest tests/ --cov=src --cov-report=term-missing
-# Expected: 115 passed, 82% coverage
+# Expected: 137 passed, 82% coverage
 
 # 6. Start the server
 uv run uvicorn src.main:app --reload
@@ -151,8 +160,14 @@ uv run uvicorn src.main:app --reload
 │   ├── conftest.py
 │   ├── integration/
 │   │   ├── test_checkout.py
+│   │   ├── test_concurrent_metering.py
+│   │   ├── test_idempotency_key_reuse.py
+│   │   ├── test_large_quantity_safety.py
+│   │   ├── test_meter_validation_edge_cases.py
 │   │   ├── test_metering.py
 │   │   ├── test_phase3_endpoints.py
+│   │   ├── test_trialing_incomplete.py
+│   │   ├── test_usage_repo_coverage.py
 │   │   └── test_webhooks.py
 │   └── unit/
 │       ├── test_auth.py
@@ -165,10 +180,7 @@ uv run uvicorn src.main:app --reload
 │       ├── test_money.py
 │       ├── test_quota_service.py
 │       ├── test_rate_limit.py
+│       ├── test_race_condition_logic.py
 │       ├── test_stripe_service.py
 │       └── test_webhook_helpers.py
 └── uv.lock
-
-Next: Phase 4
-Expand Stripe integrations with refunds, discounts, subscription items,
-customers with multiple subscriptions, and tax calculations.

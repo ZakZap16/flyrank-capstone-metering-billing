@@ -22,27 +22,27 @@ async def get_usage(
     quota_service = QuotaService(db)
     usage_repo = UsageRepository(db)
     cost_service = CostService()
-    
+
     quotas = await quota_service.get_all_quotas(tenant.id)
     if "error" in quotas:
         raise HTTPException(status_code=404, detail=quotas["error"])
-    
+
     start_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     total_cost_microunits = await usage_repo.get_monthly_cost(tenant.id, start_of_month)
     usage_breakdown = await usage_repo.get_monthly_usage_breakdown(tenant.id, start_of_month)
-    
-    # Calculate token cost breakdown
+
+    # Calculate token cost breakdown using billing rules engine
     token_breakdown = cost_service.calculate_token_breakdown(
         input_tokens=usage_breakdown.get(UsageType.INPUT_TOKENS, 0),
         cached_input_tokens=usage_breakdown.get(UsageType.CACHED_INPUT_TOKENS, 0),
         output_tokens=usage_breakdown.get(UsageType.OUTPUT_TOKENS, 0),
         reasoning_tokens=usage_breakdown.get(UsageType.REASONING_TOKENS, 0),
     )
-    
+
     return UsageResponse(
         period={
             "start": start_of_month.isoformat(),
-            "end": (start_of_month.replace(month=start_of_month.month + 1) if start_of_month.month < 12 
+            "end": (start_of_month.replace(month=start_of_month.month + 1) if start_of_month.month < 12
                    else start_of_month.replace(year=start_of_month.year + 1, month=1)).isoformat(),
         },
         plan=quotas["plan"],

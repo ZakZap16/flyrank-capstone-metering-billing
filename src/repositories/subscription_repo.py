@@ -11,10 +11,18 @@ class SubscriptionRepository:
         self.session = session
     
     async def get_active_by_tenant(self, tenant_id: uuid.UUID) -> Subscription | None:
-        """Get active subscription for the tenant"""
+        """Get usable subscription for the tenant.
+
+        Returns subscription with ACTIVE, TRIALING, or INCOMPLETE status.
+        PAST_DUE and CANCELED return None to trigger PaymentRequiredError.
+        """
         stmt = select(Subscription).where(
             Subscription.tenant_id == tenant_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
+            Subscription.status.in_([
+                SubscriptionStatus.ACTIVE,
+                SubscriptionStatus.TRIALING,
+                SubscriptionStatus.INCOMPLETE,
+            ]),
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

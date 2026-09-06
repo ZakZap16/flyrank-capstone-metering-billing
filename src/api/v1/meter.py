@@ -28,14 +28,14 @@ async def record_usage(
 ):
     """
     Record a billable usage event.
-    
-    **Idempotency**: Same `Idempotency-Key` + `usage_type` + `tenant` 
+
+    **Idempotency**: Same `Idempotency-Key` + `usage_type` + `tenant`
     returns the original event without double-counting.
-    
+
     **Quota**: Enforced before recording. Returns 429 if exceeded.
     """
     meter_service = MeterService(db)
-    
+
     try:
         event = await meter_service.record(
             tenant_id=tenant.id,
@@ -67,12 +67,11 @@ async def record_usage(
                 "message": str(exc),
             },
         )
-    
-    # Get updated quotas for response
+
     from src.services.quota_service import QuotaService
     quota_service = QuotaService(db)
     quotas = await quota_service.get_all_quotas(tenant.id)
-    
+
     return MeterResponse(
         usage_event_id=event.id,
         usage_type=event.usage_type,

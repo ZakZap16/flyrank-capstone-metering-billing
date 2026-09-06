@@ -3,11 +3,12 @@ from decimal import Decimal, ROUND_HALF_UP
 MICRO_UNITS_PER_UNIT = 1_000_000
 CENTS_PER_UNIT = 100
 
-def calculate_cost_microunits(quantity: int, price_per_million: int) -> int:
-    if quantity <= 0 or price_per_million <= 0:
+def calculate_cost_microunits(quantity: int, price_per_thousand: int) -> int:
+    """Calculate cost in micro-units. Price is per 1,000 units."""
+    if quantity <= 0 or price_per_thousand <= 0:
         return 0
     return int(
-        (Decimal(quantity) * Decimal(price_per_million) / Decimal(1_000_000))
+        (Decimal(quantity) * Decimal(price_per_thousand) / Decimal(1_000))
         .quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     )
 

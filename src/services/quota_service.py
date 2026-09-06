@@ -35,6 +35,10 @@ class QuotaService:
                 raise PaymentRequiredError("Subscription past due - payment required")
             elif subscription.status == SubscriptionStatus.CANCELED:
                 raise PaymentRequiredError("Subscription canceled")
+            elif subscription.status == SubscriptionStatus.TRIALING:
+                pass
+            elif subscription.status == SubscriptionStatus.INCOMPLETE:
+                pass
             else:
                 raise PaymentRequiredError(f"Subscription status: {subscription.status.value}")
         

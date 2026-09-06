@@ -17,7 +17,7 @@ class MeterRequest(BaseModel):
             try:
                 return UsageType(value.lower())
             except ValueError:
-                raise ValueError(f"Invalid usage type. It must be one of: {[e.vaule for e in UsageType]}")
+                raise ValueError(f"Invalid usage type. It must be one of: {[e.value for e in UsageType]}")
         return value
 
 class MeterResponse(BaseModel):
