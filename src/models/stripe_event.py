@@ -9,7 +9,7 @@ from sqlalchemy import JSON
 
 class ProcessedStripeEvent(Base):
     __tablename__ = "processed_stripe_events"
-    event_id = mapped_column(String(255), primary_key=True)  # Stripe event ID
+    event_id = mapped_column(String(255), primary_key=True)
     event_type = mapped_column(String(100), nullable=False)
     payload = mapped_column(JSON, nullable=False)
     processed_at = mapped_column(DateTime(timezone=True), server_default=func.now())

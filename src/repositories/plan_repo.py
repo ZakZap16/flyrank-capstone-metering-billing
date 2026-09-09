@@ -7,7 +7,6 @@ class PlanRepository:
         self.session = session
     
     async def get_by_id(self, plan_tier: PlanTier) -> Plan | None:
-        """Get the plan by tier (FREE or PRO)"""
         stmt = select(Plan).where(Plan.id == plan_tier)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

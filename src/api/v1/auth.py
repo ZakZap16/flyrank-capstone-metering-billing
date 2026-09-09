@@ -18,7 +18,6 @@ async def create_tenant(
     tenant_data: TenantCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new tenant with API key"""
     tenant_repo = TenantRepository(db)
     plain_key, key_hash = AuthService.generate_api_key()
     
@@ -30,7 +29,7 @@ async def create_tenant(
     return APIKeyResponse(
         tenant_id=tenant.id,
         name=tenant.name,
-        api_key=plain_key,  # Only shown once!
+        api_key=plain_key,
     )
 
 @router.get(
@@ -40,7 +39,6 @@ async def create_tenant(
 async def get_current_tenant_info(
     tenant: Tenant = Depends(get_current_tenant),
 ):
-    """Get current tenant information"""
     return TenantResponse(
         id=tenant.id,
         name=tenant.name,

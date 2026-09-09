@@ -30,13 +30,14 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = mock_tenant
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        # Patch verify_api_key to ensure it returns False so test fails if called
-        with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=True):
-            result = await get_current_tenant(
-                x_tenant_id=valid_headers["X-Tenant-ID"],
-                db=mock_session
-            )
-        assert result == mock_tenant
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with patch("src.api.middleware.auth.cache_set", new_callable=AsyncMock):
+                with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=True):
+                    result = await get_current_tenant(
+                        x_tenant_id=valid_headers["X-Tenant-ID"],
+                        db=mock_session
+                    )
+        assert result.id == mock_tenant.id
 
     @pytest.mark.asyncio
     async def test_invalid_x_tenant_id_format(self):
@@ -59,11 +60,12 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_tenant(
-                x_tenant_id=valid_headers["X-Tenant-ID"],
-                db=mock_session
-            )
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_tenant(
+                    x_tenant_id=valid_headers["X-Tenant-ID"],
+                    db=mock_session
+                )
 
         assert exc_info.value.status_code == 401
         assert "Tenant not found" in exc_info.value.detail
@@ -76,13 +78,15 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = mock_tenant
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=True) as mock_verify:
-            result = await get_current_tenant(
-                x_tenant_id=valid_headers["X-Tenant-ID"],
-                x_api_key="valid-api-key",
-                db=mock_session
-            )
-        assert result == mock_tenant
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with patch("src.api.middleware.auth.cache_set", new_callable=AsyncMock):
+                with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=True) as mock_verify:
+                    result = await get_current_tenant(
+                        x_tenant_id=valid_headers["X-Tenant-ID"],
+                        x_api_key="valid-api-key",
+                        db=mock_session
+                    )
+        assert result.id == mock_tenant.id
         mock_verify.assert_called_once_with("valid-api-key", "test_hash")
 
     @pytest.mark.asyncio
@@ -93,13 +97,14 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = mock_tenant
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=False):
-            with pytest.raises(HTTPException) as exc_info:
-                await get_current_tenant(
-                    x_tenant_id=valid_headers["X-Tenant-ID"],
-                    x_api_key="wrong-key",
-                    db=mock_session
-                )
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with patch("src.api.middleware.auth.AuthService.verify_api_key", return_value=False):
+                with pytest.raises(HTTPException) as exc_info:
+                    await get_current_tenant(
+                        x_tenant_id=valid_headers["X-Tenant-ID"],
+                        x_api_key="wrong-key",
+                        db=mock_session
+                    )
 
         assert exc_info.value.status_code == 401
         assert "Invalid API key" in exc_info.value.detail
@@ -112,14 +117,15 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = mock_tenant
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        # Pass x_api_key=None explicitly to override Header(None) default
-        with patch("src.api.middleware.auth.AuthService.verify_api_key") as mock_verify:
-            result = await get_current_tenant(
-                x_tenant_id=valid_headers["X-Tenant-ID"],
-                x_api_key=None,
-                db=mock_session
-            )
-        assert result == mock_tenant
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with patch("src.api.middleware.auth.cache_set", new_callable=AsyncMock):
+                with patch("src.api.middleware.auth.AuthService.verify_api_key") as mock_verify:
+                    result = await get_current_tenant(
+                        x_tenant_id=valid_headers["X-Tenant-ID"],
+                        x_api_key=None,
+                        db=mock_session
+                    )
+        assert result.id == mock_tenant.id
         mock_verify.assert_not_called()
 
     @pytest.mark.asyncio
@@ -134,10 +140,12 @@ class TestGetCurrentTenant:
         mock_result.scalar_one_or_none.return_value = tenant_no_hash
         mock_session.execute = AsyncMock(return_value=mock_result)
 
-        with patch("src.api.middleware.auth.AuthService.verify_api_key") as mock_verify:
-            result = await get_current_tenant(
-                x_tenant_id=valid_headers["X-Tenant-ID"],
-                db=mock_session
-            )
-        assert result == tenant_no_hash
+        with patch("src.api.middleware.auth.cache_get", return_value=None):
+            with patch("src.api.middleware.auth.cache_set", new_callable=AsyncMock):
+                with patch("src.api.middleware.auth.AuthService.verify_api_key") as mock_verify:
+                    result = await get_current_tenant(
+                        x_tenant_id=valid_headers["X-Tenant-ID"],
+                        db=mock_session
+                    )
+        assert result.id == tenant_no_hash.id
         mock_verify.assert_not_called()

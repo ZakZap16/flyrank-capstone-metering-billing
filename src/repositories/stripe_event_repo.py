@@ -8,7 +8,6 @@ class StripeEventRepository:
         self.session = session
     
     async def is_processed(self, event_id: str) -> bool:
-        """Check if we've already processed this Stripe event"""
         query = select(ProcessedStripeEvent).where(ProcessedStripeEvent.event_id == event_id)
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
@@ -20,7 +19,6 @@ class StripeEventRepository:
         payload: dict, 
         tenant_id: UUID | None = None
     ) -> ProcessedStripeEvent:
-        """Record that we've processed a Stripe event"""
         db_event = ProcessedStripeEvent(
             event_id=event_id,
             event_type=event_type,

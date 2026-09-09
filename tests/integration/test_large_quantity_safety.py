@@ -1,6 +1,5 @@
 """B4 + A4: Large token counts and massive qty - verify integer safety."""
 import pytest
-pytestmark = pytest.mark.asyncio
 import uuid
 from httpx import AsyncClient
 from src.services.cost_service import CostService
@@ -10,6 +9,7 @@ from src.models.usage_event import UsageType
 class TestLargeQuantitySafety:
     """A4: Massive qty values must not overflow or produce negative costs."""
 
+    @pytest.mark.asyncio
     async def test_max_allowed_qty_succeeds(self, client: AsyncClient, auth_headers: dict):
         """qty = 10,000,000 should succeed - use input_tokens (FREE plan has 500k limit, still fails, use small qty).
 
@@ -25,6 +25,7 @@ class TestLargeQuantitySafety:
         data = resp.json()
         assert data["cost_microunits"] > 0
 
+    @pytest.mark.asyncio
     async def test_cost_calculation_with_huge_token_count(self):
         """B4: 10^9 input tokens with integer math - no overflow."""
         cost = CostService.calculate(UsageType.INPUT_TOKENS, 1_000_000_000)

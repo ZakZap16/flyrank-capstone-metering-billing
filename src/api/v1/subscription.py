@@ -21,14 +21,6 @@ async def cancel_subscription(
     stripe_service: StripeService = Depends(get_stripe_service),
     settings: Settings = Depends(get_settings),
 ):
-    """
-    Cancel the tenant's subscription.
-    By default, cancels at the end of the billing period.
-    Requires authentication (X-Tenant-ID header).
-    
-    Note: This endpoint requires the tenant to have a Stripe subscription ID.
-    In production, you would fetch the subscription from the database and update it.
-    """
     if not tenant.stripe_customer_id:
         logger.warning("tenant_has_no_stripe_customer tenant_id=%s", tenant.id)
         raise HTTPException(

@@ -1,0 +1,23 @@
+name: FlyRank Capstone Metering & Billing Engine
+description: Multi-tenant usage metering and Stripe billing integration
+version: "1.0"
+
+run:
+  command: uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+  port: 8000
+  health: /health
+
+seed:
+  command: uv run python seed.py
+  before: uv run alembic upgrade head
+
+test:
+  command: uv run pytest tests/ --cov=src --cov-report=term-missing
+  expected: "passed"
+
+docker:
+  compose: docker compose up --build
+  health: curl http://localhost:8000/health
+
+demo:
+  script: demo.sh

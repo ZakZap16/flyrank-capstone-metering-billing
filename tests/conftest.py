@@ -76,7 +76,6 @@ async def async_session():
 async def client(async_session):
     """AsyncClient with overridden database dependency."""
     from src.api.deps import get_db
-    from src.api.middleware.rate_limit import rate_limiter
 
     app = create_app()
 
@@ -90,9 +89,6 @@ async def client(async_session):
             raise
 
     app.dependency_overrides[get_db] = override_get_db
-
-    # Reset global rate limiter to ensure test isolation
-    rate_limiter._requests.clear()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
@@ -104,7 +100,6 @@ async def client(async_session):
 async def async_client(async_session):
     """Alias for client - AsyncClient with overridden database dependency."""
     from src.api.deps import get_db
-    from src.api.middleware.rate_limit import rate_limiter
 
     app = create_app()
 
@@ -118,8 +113,6 @@ async def async_client(async_session):
             raise
 
     app.dependency_overrides[get_db] = override_get_db
-
-    rate_limiter._requests.clear()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac

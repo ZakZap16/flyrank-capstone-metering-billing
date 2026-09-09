@@ -1,14 +1,19 @@
+"""Integration tests for the meter endpoint.
+
+Uses direct DB inserts for bulk setup (avoids slow HTTP loops).
+"""
 import pytest
 from httpx import AsyncClient
 from src.models.tenant import Tenant
 from src.models.plan import PlanTier
 from src.models.subscription import Subscription, SubscriptionStatus
 from src.models.usage_event import UsageEvent, UsageType
-from src.config.database import AsyncSessionLocal, TestAsyncSessionLocal
+from src.config.database import TestAsyncSessionLocal
 import uuid
 from datetime import datetime, timezone
 
 pytestmark = pytest.mark.asyncio
+
 
 class TestIdempotentMetering:
     """Probe 1: Same idempotency key == exactly one usage event."""
@@ -27,7 +32,7 @@ class TestIdempotentMetering:
         assert resp1.status_code == 200
         event1 = resp1.json()
         
-        # Second request with same key
+        # Second request with same key (hits Redis idempotency cache)
         resp2 = await client.post(
             "/api/v1/meter",
             json={"usage_type": "api_call", "qty": 1},
@@ -55,13 +60,16 @@ class TestIdempotentMetering:
         
         # Verify exactly ONE event in database
         async with TestAsyncSessionLocal() as db:
-            from src.repositories.usage_repo import UsageRepository
-            usage_repo = UsageRepository(db)
-            events = await usage_repo.get_monthly_usage(
-                test_tenant.id, UsageType.API_CALL,
-                datetime.now(timezone.utc).replace(day=1)
+            from sqlalchemy import select, func
+            result = await db.execute(
+                select(func.count(UsageEvent.id)).where(
+                    UsageEvent.tenant_id == test_tenant.id,
+                    UsageEvent.idempotency_key == key,
+                    UsageEvent.usage_type == UsageType.API_CALL,
+                )
             )
-            assert events == 1
+            count = result.scalar()
+            assert count == 1
 
 
 class TestQuotaEnforcement:
@@ -70,17 +78,21 @@ class TestQuotaEnforcement:
     async def test_exact_quota_boundary_allowed(
         self, client: AsyncClient, auth_headers: dict, test_tenant: Tenant
     ):
-        # Use 4,999 of 5,000
-        for i in range(4999):
-            key = str(uuid.uuid4())
-            resp = await client.post(
-                "/api/v1/meter",
-                json={"usage_type": "api_call", "qty": 1},
-                headers={**auth_headers, "Idempotency-Key": key},
-            )
-            assert resp.status_code == 200
+        """Pre-insert 4,999 events via DB, then 5,000th via HTTP should succeed."""
+        now = datetime.now(timezone.utc)
+        async with TestAsyncSessionLocal() as session:
+            for i in range(4999):
+                session.add(UsageEvent(
+                    tenant_id=test_tenant.id,
+                    idempotency_key=str(uuid.uuid4()),
+                    usage_type=UsageType.API_CALL,
+                    quantity=1,
+                    cost_microunits=100,
+                    created_at=now,
+                ))
+            await session.commit()
         
-        # The 5,000th should be allowed
+        # The 5,000th should be allowed via HTTP
         key = str(uuid.uuid4())
         resp = await client.post(
             "/api/v1/meter",
@@ -92,10 +104,7 @@ class TestQuotaEnforcement:
     async def test_over_quota_returns_429(
         self, client: AsyncClient, auth_headers: dict, test_tenant: Tenant
     ):
-        # Pre-insert 10,000 usage events to hit the quota limit
-        from src.models.usage_event import UsageEvent, UsageType
-        from datetime import datetime, timezone
-        from src.config.database import TestAsyncSessionLocal
+        """Pre-insert 10,000 events via DB, next request should be 429."""
         now = datetime.now(timezone.utc)
         async with TestAsyncSessionLocal() as session:
             for i in range(10000):
@@ -126,9 +135,7 @@ class TestQuotaEnforcement:
     async def test_past_due_subscription_returns_402(
         self, client: AsyncClient, auth_headers: dict, test_tenant: Tenant, async_session
     ):
-        # Set subscription to past_due
         from src.repositories.subscription_repo import SubscriptionRepository
-        from src.models.subscription import SubscriptionStatus
         sub_repo = SubscriptionRepository(async_session)
         sub = await sub_repo.get_active_by_tenant(test_tenant.id)
         sub.status = SubscriptionStatus.PAST_DUE
@@ -147,7 +154,6 @@ class TestQuotaEnforcement:
         self, client: AsyncClient, auth_headers: dict, test_tenant: Tenant, async_session
     ):
         from src.repositories.subscription_repo import SubscriptionRepository
-        from src.models.subscription import SubscriptionStatus
         sub_repo = SubscriptionRepository(async_session)
         sub = await sub_repo.get_active_by_tenant(test_tenant.id)
         sub.status = SubscriptionStatus.CANCELED

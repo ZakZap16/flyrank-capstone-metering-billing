@@ -20,10 +20,6 @@ class UsageRepository:
         request_ip: str | None = None,
         user_agent: str | None = None,
     ) -> UsageEvent | None:
-        """
-        Atomically record usage event with idempotency.
-        Returns existing event if duplicate key, None if quota would be exceeded.
-        """
         stmt = pg_insert(UsageEvent).values(
             tenant_id=tenant_id,
             idempotency_key=idempotency_key,
@@ -42,7 +38,6 @@ class UsageRepository:
         if event:
             return event
         
-        # Conflict occurred - fetch existing
         existing = await self.session.execute(
             select(UsageEvent).where(
                 and_(
@@ -57,7 +52,6 @@ class UsageRepository:
     async def get_monthly_usage(
         self, tenant_id: uuid.UUID, usage_type: UsageType, start_of_month: datetime
     ) -> int:
-        """Get total usage for a tenant/type in current month."""
         result = await self.session.execute(
             select(func.coalesce(func.sum(UsageEvent.quantity), 0)).where(
                 and_(
@@ -72,7 +66,6 @@ class UsageRepository:
     async def get_monthly_usage_breakdown(
         self, tenant_id: uuid.UUID, start_of_month: datetime
     ) -> dict[UsageType, int]:
-        """Get usage breakdown by type for current month."""
         result = await self.session.execute(
             select(UsageEvent.usage_type, func.coalesce(func.sum(UsageEvent.quantity), 0))
             .where(
@@ -86,7 +79,6 @@ class UsageRepository:
         return {row.usage_type: int(row[1]) for row in result.all()}
     
     async def get_monthly_cost(self, tenant_id: uuid.UUID, start_of_month: datetime) -> int:
-        """Get total cost in micro-units for current month."""
         result = await self.session.execute(
             select(func.coalesce(func.sum(UsageEvent.cost_microunits), 0)).where(
                 and_(

@@ -11,11 +11,6 @@ class SubscriptionRepository:
         self.session = session
     
     async def get_active_by_tenant(self, tenant_id: uuid.UUID) -> Subscription | None:
-        """Get usable subscription for the tenant.
-
-        Returns subscription with ACTIVE, TRIALING, or INCOMPLETE status.
-        PAST_DUE and CANCELED return None to trigger PaymentRequiredError.
-        """
         stmt = select(Subscription).where(
             Subscription.tenant_id == tenant_id,
             Subscription.status.in_([
@@ -28,7 +23,6 @@ class SubscriptionRepository:
         return result.scalar_one_or_none()
     
     async def get_by_stripe_id(self, stripe_subscription_id: str) -> Subscription | None:
-        """Get subscription by Stripe subscription ID"""
         stmt = select(Subscription).where(
             Subscription.stripe_subscription_id == stripe_subscription_id,
         )
@@ -36,14 +30,12 @@ class SubscriptionRepository:
         return result.scalar_one_or_none()
     
     async def create(self, subscription: Subscription) -> Subscription:
-        """Create a new subscription"""
         self.session.add(subscription)
         await self.session.flush()
         await self.session.refresh(subscription)
         return subscription
     
     async def update(self, subscription: Subscription) -> Subscription:
-        """Update an existing subscription"""
         await self.session.flush()
         await self.session.refresh(subscription)
         return subscription
@@ -58,10 +50,6 @@ class SubscriptionRepository:
         plan_id: PlanTier,
         cancel_at_period_end: bool,
     ) -> Subscription:
-        """
-        Create or update subscription from Stripe webhook
-        Uses ON CONFLICT on stripe_subscription_id for idempotency
-        """
         stmt = pg_insert(Subscription).values(
             tenant_id=tenant_id,
             stripe_subscription_id=stripe_subscription_id,

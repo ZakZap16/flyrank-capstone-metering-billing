@@ -6,7 +6,6 @@ import uuid
 
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
-    """Validate Idempotency-Key header on mutating endpoints."""
 
     IDEMPOTENCY_PATHS = ["/api/v1/meter"]
     IDEMPOTENCY_METHODS = ["POST", "PUT", "PATCH"]

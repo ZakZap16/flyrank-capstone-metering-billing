@@ -54,21 +54,15 @@ class TestMeterErrorResponses:
 
     async def test_success_response_structure(self, async_client, test_tenant, auth_headers):
         """Success response returns correct MeterResponse structure."""
-        with patch("src.services.meter_service.MeterService.record") as mock_record, \
-             patch("src.services.quota_service.QuotaService.get_all_quotas", new_callable=AsyncMock) as mock_quotas:
+        with patch("src.services.meter_service.MeterService.record") as mock_record:
 
             mock_event = MagicMock()
             mock_event.id = uuid.uuid4()
             mock_event.usage_type = UsageType.API_CALL
             mock_event.quantity = 1
             mock_event.cost_microunits = 100
-            mock_record.return_value = mock_event
-
-            mock_quotas.return_value = {
-                "plan": "pro",
-                "api_calls": {"used": 5, "limit": 50000, "remaining": 49995},
-                "ai_tokens": {"used": 100, "limit": 5000000, "remaining": 4999900},
-            }
+            mock_quota_info = {"used": 5, "limit": 50000, "remaining": 49995}
+            mock_record.return_value = (mock_event, mock_quota_info)
 
             key = str(uuid.uuid4())
             resp = await async_client.post(
@@ -85,7 +79,6 @@ class TestMeterErrorResponses:
             assert data["cost_microunits"] == 100
             assert "remaining_quota" in data
             assert data["remaining_quota"]["api_calls"] == 49995
-            assert data["remaining_quota"]["ai_tokens"] == 4999900
 
     async def test_success_response_cost_microunits_none(self, async_client, test_tenant, auth_headers):
         """MeterResponse handles cost_microunits=None gracefully."""
@@ -97,7 +90,8 @@ class TestMeterErrorResponses:
             mock_event.usage_type = UsageType.API_CALL
             mock_event.quantity = 1
             mock_event.cost_microunits = None
-            mock_record.return_value = mock_event
+            mock_quota_info = {"used": 0, "limit": 10000, "remaining": 10000}
+            mock_record.return_value = (mock_event, mock_quota_info)
 
             mock_quotas.return_value = {
                 "plan": "free",

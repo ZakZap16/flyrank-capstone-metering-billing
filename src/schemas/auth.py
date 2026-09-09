@@ -10,7 +10,7 @@ class APIKeyResponse(BaseModel):
     model_config = {"strict": True}
     tenant_id: str
     name: str
-    api_key: str  # Plain key - only shown once!
+    api_key: str
 
 class TenantResponse(BaseModel):
     model_config = {"strict": True}

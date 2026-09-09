@@ -103,7 +103,7 @@ class TestUsageRepository:
 
         key = str(uuid.uuid4())
         svc = MeterService(async_session)
-        event1 = await svc.record(
+        event1, _ = await svc.record(
             tenant_id=usage_tenant.id,
             usage_type=UsageType.API_CALL,
             qty=1,
@@ -114,7 +114,7 @@ class TestUsageRepository:
         await async_session.commit()
 
         # Second call with same key+usage_type returns same event
-        event2 = await svc.record(
+        event2, _ = await svc.record(
             tenant_id=usage_tenant.id,
             usage_type=UsageType.API_CALL,
             qty=1,

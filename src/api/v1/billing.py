@@ -21,10 +21,6 @@ async def create_portal_session(
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Create a Stripe customer portal session for subscription management.
-    Requires authentication (X-Tenant-ID header).
-    """
     if not tenant.stripe_customer_id:
         logger.warning("tenant_has_no_stripe_customer tenant_id=%s", tenant.id)
         raise HTTPException(

@@ -3,9 +3,7 @@ from src.models.usage_event import UsageType
 import uuid
 
 
-
 class MeterRequest(BaseModel):
-    """Request to record the usage"""
     model_config = {"strict": True, "extra": "forbid"}
     usage_type: UsageType = Field(..., description="Type of the usage to")
     qty: int = Field(..., gt=0, le=10_000_000, description="Quantity (should always be +ve integer)")
@@ -21,7 +19,6 @@ class MeterRequest(BaseModel):
         return value
 
 class MeterResponse(BaseModel):
-    """Response after recording the usage"""
     model_config = {"strict": True}
     recorded: bool = True
     usage_event_id: uuid.UUID

@@ -1,79 +1,112 @@
-"""Unit tests for InMemoryRateLimiter."""
+"""Unit tests for RedisRateLimiter."""
 import pytest
 import time
-import threading
-from src.api.middleware.rate_limit import InMemoryRateLimiter
+from unittest.mock import AsyncMock, MagicMock, patch
+from src.api.middleware.rate_limit import RedisRateLimiter
 
 
-class TestInMemoryRateLimiter:
-    """Test the in-memory rate limiter."""
+def _make_mock_redis(pipeline_result, zrange_result=None):
+    """Create a mock Redis with async pipeline.execute()."""
+    mock_pipe = MagicMock()
+    mock_pipe.execute = AsyncMock(return_value=pipeline_result)
+    mock_pipe.zremrangebyscore = MagicMock(return_value=MagicMock())
+    mock_pipe.zcard = MagicMock(return_value=MagicMock())
+    mock_pipe.zadd = MagicMock(return_value=MagicMock())
+    mock_pipe.expire = MagicMock(return_value=MagicMock())
 
-    def test_allows_first_request(self):
-        limiter = InMemoryRateLimiter(max_requests=5, window_seconds=60)
-        allowed, retry_after = limiter.is_allowed("test_key")
+    mock_redis = MagicMock()
+    mock_redis.pipeline.return_value = mock_pipe
+    if zrange_result is not None:
+        mock_redis.zrange = AsyncMock(return_value=zrange_result)
+    return mock_redis
+
+
+class TestRedisRateLimiter:
+    """Test the Redis-backed rate limiter."""
+
+    @pytest.mark.asyncio
+    async def test_allows_first_request(self):
+        """First request should always be allowed."""
+        mock_redis = _make_mock_redis([0, 0, 1, True])
+
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=5, window_seconds=60)
+            allowed, retry_after = await limiter.is_allowed("test_key")
+
         assert allowed is True
         assert retry_after == 0
 
-    def test_allows_requests_within_limit(self):
-        limiter = InMemoryRateLimiter(max_requests=3, window_seconds=60)
-        for i in range(3):
-            allowed, _ = limiter.is_allowed("test_key")
-            assert allowed is True
+    @pytest.mark.asyncio
+    async def test_allows_requests_within_limit(self):
+        """Requests within limit should be allowed."""
+        mock_redis = _make_mock_redis([0, 1, 1, True])
 
-    def test_blocks_requests_exceeding_limit(self):
-        limiter = InMemoryRateLimiter(max_requests=2, window_seconds=60)
-        # Use up the quota
-        limiter.is_allowed("test_key")
-        limiter.is_allowed("test_key")
-        # This one should be blocked
-        allowed, retry_after = limiter.is_allowed("test_key")
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=3, window_seconds=60)
+            for i in range(3):
+                allowed, _ = await limiter.is_allowed("test_key")
+                assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_requests_exceeding_limit(self):
+        """Requests exceeding limit should be blocked."""
+        mock_redis = _make_mock_redis(
+            pipeline_result=[0, 2, 1, True],
+            zrange_result=[(b"1000000.0", 1000000.0)],
+        )
+
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=2, window_seconds=60)
+            allowed, retry_after = await limiter.is_allowed("test_key")
+
         assert allowed is False
         assert retry_after > 0
 
-    def test_different_keys_have_separate_limits(self):
-        limiter = InMemoryRateLimiter(max_requests=1, window_seconds=60)
-        assert limiter.is_allowed("key_a")[0] is True
-        assert limiter.is_allowed("key_b")[0] is True
+    @pytest.mark.asyncio
+    async def test_different_keys_have_separate_limits(self):
+        """Different keys should have separate rate limits."""
+        mock_redis = _make_mock_redis([0, 0, 1, True])
 
-    def test_old_requests_expire_after_window(self):
-        limiter = InMemoryRateLimiter(max_requests=2, window_seconds=1)
-        # Use up the limit
-        limiter.is_allowed("test_key")
-        limiter.is_allowed("test_key")
-        # Should be blocked
-        assert limiter.is_allowed("test_key")[0] is False
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=1, window_seconds=60)
+            allowed_a, _ = await limiter.is_allowed("key_a")
+            allowed_b, _ = await limiter.is_allowed("key_b")
 
-        # Simulate time passing by directly modifying timestamps
-        # (in a real scenario, we would sleep, but for unit tests we can manipulate)
+        assert allowed_a is True
+        assert allowed_b is True
 
-    def test_retry_after_is_positive_when_blocked(self):
-        limiter = InMemoryRateLimiter(max_requests=1, window_seconds=60)
-        limiter.is_allowed("test_key")  # Use quota
-        _, retry_after = limiter.is_allowed("test_key")
+    @pytest.mark.asyncio
+    async def test_retry_after_is_positive_when_blocked(self):
+        """Retry-after should be positive when blocked."""
+        mock_redis = _make_mock_redis(
+            pipeline_result=[0, 1, 1, True],
+            zrange_result=[(b"1000000.0", 1000000.0)],
+        )
+
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=1, window_seconds=60)
+            _, retry_after = await limiter.is_allowed("test_key")
+
         assert retry_after > 0
         assert isinstance(retry_after, int)
 
-    def test_thread_safety(self):
-        """Test that concurrent access doesn't cause issues."""
-        limiter = InMemoryRateLimiter(max_requests=1000, window_seconds=60)
-        results = []
+    @pytest.mark.asyncio
+    async def test_falls_back_to_allow_when_redis_unavailable(self):
+        """Should allow requests when Redis is unavailable (fail open)."""
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, side_effect=Exception("Redis down")):
+            limiter = RedisRateLimiter(max_requests=1, window_seconds=60)
+            allowed, retry_after = await limiter.is_allowed("test_key")
 
-        def make_requests():
-            for _ in range(100):
-                results.append(limiter.is_allowed("shared_key")[0])
+        assert allowed is True
+        assert retry_after == 0
 
-        threads = [threading.Thread(target=make_requests) for _ in range(5)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # All 500 requests should succeed (well under 1000 limit)
-        assert all(r is True for r in results)
-
-    def test_max_requests_can_be_large(self):
+    @pytest.mark.asyncio
+    async def test_max_requests_can_be_large(self):
         """Test with a very large limit (like our test config)."""
-        limiter = InMemoryRateLimiter(max_requests=100_000, window_seconds=60)
-        for _ in range(100):
-            allowed, _ = limiter.is_allowed("test_key")
-            assert allowed is True
+        mock_redis = _make_mock_redis([0, 50, 1, True])
+
+        with patch("src.api.middleware.rate_limit.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+            limiter = RedisRateLimiter(max_requests=100_000, window_seconds=60)
+            for _ in range(100):
+                allowed, _ = await limiter.is_allowed("test_key")
+                assert allowed is True
