@@ -15,13 +15,14 @@ class Settings(BaseSettings):
     APP_NAME: str = "Usage Metering & Billing Engine"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    LOG_LEVEL: str = "INFO"
     API_V1_PREFIX: str = "/api/v1"
 
     DATABASE_URL: PostgresDsn = Field(
         default="postgresql+asyncpg://app_user:dev_password@localhost:5432/metering_billing"
     )
-    DATABASE_POOL_SIZE: int = 10
-    DATABASE_MAX_OVERFLOW: int = 5
+    DATABASE_POOL_SIZE: int = 20
+    DATABASE_MAX_OVERFLOW: int = 10
 
     SECRET_KEY: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
@@ -29,7 +30,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS: int = 100_000
     RATE_LIMIT_WINDOW_SECONDS: int = 60
 
-    # Stripe settings
     STRIPE_API_KEY: str = Field(default="sk_test_...")
     STRIPE_WEBHOOK_SECRET: str = Field(default="whsec_...")
     STRIPE_PRICE_ID_PRO: str = Field(default="price_...")
@@ -38,13 +38,10 @@ class Settings(BaseSettings):
     STRIPE_CANCEL_URL: str = "http://localhost:3000/cancel"
     STRIPE_PUBLIC_KEY: str = Field(default="pk_test_...")
 
-    # Redis for rate limiter
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
-    # Frontend URLs for checkout/portal redirects
     FRONTEND_URL: str = "http://localhost:3000"
 
-    # Pricing (micro-units, integer-only) - per 1,000 units
     PRICE_API_CALL_PER_THOUSAND: int = 1_000_000
     PRICE_INPUT_TOKEN_PER_THOUSAND: int = 150
     PRICE_CACHED_INPUT_TOKEN_PER_THOUSAND: int = 75
