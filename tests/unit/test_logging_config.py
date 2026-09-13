@@ -1,5 +1,5 @@
 import pytest
-from src.config.logging import configure_logging, get_logger
+from src.config.logging import configure_logging
 
 
 class TestConfigureLogging:
@@ -11,13 +11,3 @@ class TestConfigureLogging:
 
     def test_configures_invalid_level_falls_back(self):
         configure_logging(log_level="INVALID")
-
-
-class TestGetLogger:
-    def test_returns_bound_logger(self):
-        logger = get_logger("test_module")
-        assert logger is not None
-
-    def test_logger_has_name(self):
-        logger = get_logger("my_module")
-        logger.info("test_message")

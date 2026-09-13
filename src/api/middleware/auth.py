@@ -4,7 +4,7 @@ from sqlalchemy import select
 from src.api.deps import get_db
 from src.models.tenant import Tenant
 from src.services.auth_service import AuthService
-from src.config.cache import cache_get, cache_set, cache_delete
+from src.config.cache import cache_get, cache_set
 import uuid
 
 _TENANT_CACHE_PREFIX = "tenant:"
@@ -63,7 +63,3 @@ async def get_current_tenant(
     await cache_set(cache_key, cache_data, ttl_seconds=_TENANT_CACHE_TTL)
 
     return tenant
-
-
-async def invalidate_tenant_cache(tenant_id: uuid.UUID) -> None:
-    await cache_delete(f"{_TENANT_CACHE_PREFIX}{tenant_id}")

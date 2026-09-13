@@ -28,7 +28,3 @@ class CostService:
             "cached_input_tokens": CostService.calculate(UsageType.CACHED_INPUT_TOKENS, cached_input_tokens),
             "output_tokens": CostService.calculate(UsageType.OUTPUT_TOKENS, combined_output),
         }
-
-    @staticmethod
-    def total_token_cost(breakdown: dict[str, int]) -> int:
-        return sum(breakdown.values())

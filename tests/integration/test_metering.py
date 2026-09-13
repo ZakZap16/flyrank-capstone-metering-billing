@@ -4,15 +4,27 @@ Uses direct DB inserts for bulk setup (avoids slow HTTP loops).
 """
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from src.models.tenant import Tenant
 from src.models.plan import PlanTier
 from src.models.subscription import Subscription, SubscriptionStatus
 from src.models.usage_event import UsageEvent, UsageType
-from src.config.database import TestAsyncSessionLocal
+from src.config.settings import get_settings
 import uuid
 from datetime import datetime, timezone
 
 pytestmark = pytest.mark.asyncio
+
+_test_engine = create_async_engine(
+    str(get_settings().DATABASE_URL).replace("metering_billing", "metering_billing_test"),
+    poolclass=NullPool,
+    echo=False,
+)
+TestAsyncSessionLocal = async_sessionmaker(
+    _test_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+)
 
 
 class TestIdempotentMetering:

@@ -48,15 +48,6 @@ class TestCostService:
         assert "output_tokens" in breakdown
         assert "reasoning_tokens" not in breakdown
 
-    def test_total_token_cost_sums_categories(self):
-        breakdown = {
-            "input_tokens": 150_000,
-            "cached_input_tokens": 37_500,
-            "output_tokens": 1_500_000,
-        }
-        total = CostService.total_token_cost(breakdown)
-        assert total == 1_687_500
-
     def test_gemini_formula_combined_output_and_reasoning(self):
         """Gemini pricing: (Input * 150) + (Cached * 75) + ((Output + Reasoning) * 600) / 1000"""
         breakdown = CostService.calculate_token_breakdown(
@@ -65,14 +56,13 @@ class TestCostService:
             output_tokens=200_000,
             reasoning_tokens=50_000,
         )
-        total = CostService.total_token_cost(breakdown)
 
         expected_input = (100_000 * 150) // 1000
         expected_cached = (50_000 * 75) // 1000
         expected_output = ((200_000 + 50_000) * 600) // 1000
         expected = expected_input + expected_cached + expected_output
 
-        assert total == expected
+        assert sum(breakdown.values()) == expected
         assert breakdown["output_tokens"] == expected_output
         assert "reasoning_tokens" not in breakdown
 

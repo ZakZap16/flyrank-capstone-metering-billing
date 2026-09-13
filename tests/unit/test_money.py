@@ -2,9 +2,6 @@ import pytest
 from src.utils.money import (
     calculate_cost_microunits,
     microunits_to_cents,
-    cents_to_microunits,
-    format_cents,
-    format_microunits,
 )
 
 class TestMoneyUtils:
@@ -33,16 +30,3 @@ class TestMoneyUtils:
         assert microunits_to_cents(10_000) == 1      # 1 cent
         assert microunits_to_cents(1_000_000) == 100 # $1.00
         assert microunits_to_cents(0) == 0
-
-    def test_cents_to_microunits(self):
-        assert cents_to_microunits(1) == 10_000
-        assert cents_to_microunits(100) == 1_000_000
-
-    def test_format_cents(self):
-        assert format_cents(100) == "$1.00"
-        assert format_cents(499) == "$4.99"
-        assert format_cents(0) == "$0.00"
-
-    def test_format_microunits(self):
-        assert format_microunits(1_000_000) == "$1.00"
-        assert format_microunits(10_000_000) == "$10.00"

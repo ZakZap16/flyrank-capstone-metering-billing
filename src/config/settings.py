@@ -52,10 +52,6 @@ class Settings(BaseSettings):
     def is_test_stripe(self) -> bool:
         return self.STRIPE_API_KEY.startswith("sk_test_")
 
-    def validate_stripe_test_mode(self) -> None:
-        if not self.is_test_stripe:
-            raise ValueError("STRIPE_API_KEY must be test mode (sk_test_)")
-
 
 @lru_cache
 def get_settings() -> Settings:

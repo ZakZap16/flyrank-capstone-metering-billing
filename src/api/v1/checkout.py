@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from src.api.middleware.auth import get_current_tenant
-from src.api.deps import get_db
+from src.api.deps import get_db, get_stripe_service
 from src.models.tenant import Tenant
 from src.services.stripe_service import StripeService
 from src.config.settings import get_settings, Settings
@@ -11,9 +11,6 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checkout", tags=["checkout"])
 
-
-def get_stripe_service() -> StripeService:
-    return StripeService()
 
 @router.post("/session")
 async def create_checkout_session(

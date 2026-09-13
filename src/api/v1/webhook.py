@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, status
-from src.services.stripe_service import StripeService
 from src.services.quota_service import QuotaService
 from src.services.auth_service import AuthService
+from src.services.stripe_service import StripeService
 from src.repositories.stripe_event_repo import StripeEventRepository
 from src.repositories.tenant_repo import TenantRepository
 from src.repositories.subscription_repo import SubscriptionRepository
@@ -10,13 +10,14 @@ from src.models.tenant import Tenant
 from src.models.subscription import Subscription, SubscriptionStatus
 from src.models.plan import PlanTier
 from src.config.settings import get_settings, Settings
-from src.api.deps import get_db
+from src.api.deps import get_db, get_stripe_service
 from src.config.cache import cache_delete, cache_delete_pattern
 from sqlalchemy.ext.asyncio import AsyncSession
+import inspect
 import logging
 import stripe
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -27,9 +28,6 @@ _SUBSCRIPTION_CACHE_PREFIX = "sub:"
 async def _invalidate_subscription_cache(tenant_id: UUID) -> None:
     await cache_delete(f"{_SUBSCRIPTION_CACHE_PREFIX}{tenant_id}")
 
-
-def get_stripe_service() -> StripeService:
-    return StripeService()
 
 
 def get_stripe_event_repo(db: AsyncSession = Depends(get_db)) -> StripeEventRepository:
@@ -167,7 +165,6 @@ async def _process_stripe_event(
     
     handler = event_handlers.get(event.type)
     if handler:
-        import inspect
         sig = inspect.signature(handler)
         available_args = {
             "stripe_service": stripe_service,
@@ -275,7 +272,7 @@ async def _create_or_update_subscription(
         stripe_subscription_id=subscription_id,
         status=SubscriptionStatus.ACTIVE,
         current_period_start=datetime.now(timezone.utc),
-        current_period_end=datetime.now(timezone.utc) + __import__('datetime').timedelta(days=30),
+        current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
         plan_id=plan_tier,
         cancel_at_period_end=False,
     )

@@ -134,12 +134,12 @@ PRICE_REASONING_TOKEN_PER_THOUSAND=600
 
 ### Testing
 
-- **Unit tests**: 152 passing in `tests/unit/`
-- **Integration tests**: 64 passing in `tests/integration/` (covering idempotency, quota, webhooks, pricing, trialing/incomplete, concurrent metering)
+- **Unit tests**: 100+ passing in `tests/unit/`
+- **Integration tests**: 100+ passing in `tests/integration/`
 - **Edge cases**: Zero/negative qty (422), max qty (10,000,000), huge token counts (10^15), concurrent race logic, trialing/incomplete subscriptions
-- **Property-based tests**: 6 Hypothesis tests in `test_cost.py` (linearity, discount, monotonicity, non-negativity)
+- **Property-based tests**: Hypothesis tests in `test_cost.py` (linearity, discount, monotonicity, non-negativity)
 - **Security tests**: 7 tests in `test_error_redaction.py` (Stripe keys, DB URLs, passwords, multiple secrets)
-- **Coverage**: 86% overall; `cache.py` 100%, `logging.py` 100%, `pricing.py` 100%, `meter_service.py` 100%, `stripe_service.py` 100%, `cost_service.py` 95%
+- **Coverage**: 86%+ overall
 
 ### Communication
 

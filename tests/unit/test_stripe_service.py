@@ -214,29 +214,3 @@ class TestStripeService:
             mock_customer_class.retrieve.assert_called_once_with("cus_123")
             assert result.email == "test@example.com"
     
-    @pytest.mark.asyncio
-    async def test_cancel_subscription_calls_stripe_sdk(self):
-        """Test cancel_subscription calls stripe.Subscription.delete with correct id."""
-        mock_sub = MagicMock()
-        mock_sub.id = "sub_123"
-        mock_sub.status = "canceled"
-        
-        mock_subscription_class = MagicMock()
-        mock_subscription_class.delete = AsyncMock(return_value=mock_sub)
-        
-        mock_stripe = MagicMock()
-        mock_stripe.api_key = "sk_test_xxx"
-        mock_stripe.Subscription = mock_subscription_class
-        
-        with patch("src.services.stripe_service.get_settings") as mock_settings:
-            mock_settings.return_value.STRIPE_API_KEY = "sk_test_xxx"
-            mock_settings.return_value.stripe_api_key = None
-            
-            from src.services.stripe_service import StripeService
-            service = StripeService()
-            service.client = mock_stripe
-            
-            result = await service.cancel_subscription("sub_123")
-            
-            mock_subscription_class.delete.assert_called_once_with("sub_123")
-            assert result.status == "canceled"

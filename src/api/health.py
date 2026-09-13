@@ -1,21 +1,13 @@
-
-
-
-
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from src.api.deps import get_db
+from src.api.deps import get_db, get_stripe_service
 from src.services.stripe_service import StripeService
 from src.config.settings import get_settings, Settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
-
-
-def get_stripe_service() -> StripeService:
-    return StripeService()
 
 
 @router.get("/health")

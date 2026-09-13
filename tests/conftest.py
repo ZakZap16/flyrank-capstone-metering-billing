@@ -74,7 +74,7 @@ async def async_session():
 
 @pytest_asyncio.fixture
 async def client(async_session):
-    """AsyncClient with overridden database dependency."""
+    """Alias for async_client."""
     from src.api.deps import get_db
 
     app = create_app()
@@ -98,7 +98,7 @@ async def client(async_session):
 
 @pytest_asyncio.fixture
 async def async_client(async_session):
-    """Alias for client - AsyncClient with overridden database dependency."""
+    """AsyncClient with overridden database dependency."""
     from src.api.deps import get_db
 
     app = create_app()

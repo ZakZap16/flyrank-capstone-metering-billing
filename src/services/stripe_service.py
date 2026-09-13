@@ -50,6 +50,3 @@ class StripeService:
     
     async def get_customer(self, customer_id: str) -> stripe.Customer:
         return await self.client.Customer.retrieve(customer_id)
-    
-    async def cancel_subscription(self, subscription_id: str) -> stripe.Subscription:
-        return await self.client.Subscription.delete(subscription_id)
